@@ -56,7 +56,6 @@ function onOpen(e) {
     DocumentApp.getUi().createAddonMenu()
         .addItem('Add To Drive', 'ConvertToMarkdown')
         .addItem('Download MD file', 'downloadMdFile')
-        .addItem('Change Output Folder', 'changeOutputFolder')
         .addToUi();
 }
 
@@ -114,9 +113,9 @@ function ConvertToMarkdown() {
     var photo;
 
     try {
-        var numChildren = DocumentApp.getActiveDocument().getActiveSection().getNumChildren();
-        //By default, it saves in the folder named xt-docs-md-files. Change this value to save the document in a different folder
-        var commonFolderName = config.getInstance().getCommonFolder();
+      var numChildren = DocumentApp.getActiveDocument().getActiveSection().getNumChildren();
+      var folder = getCurrentFolder();
+      var commonFolderName = config.getInstance().getCommonFolder();
 
         // Walk through all the child elements of the doc.
         for (var i = 0; i < numChildren; i++) {
@@ -165,28 +164,11 @@ function ConvertToMarkdown() {
 
         }
 
-        //Checking if the common folder is present in user's google drive. If not creating it.
-        if (checkIfFolderExists(commonFolderName)) {
-            commonFolder = DocsList.getFolder(commonFolderName);
-        } else {
-            commonFolder = DocsList.createFolder(commonFolderName);
-        }
-
-        //Checking if a folder with the current file name is present within the common folder. If not creating it.
-        folderName = DocumentApp.getActiveDocument().getName();
-        folder = checkIfFolderExistsInParent(commonFolder, folderName);
-        if (!folder) {
-            folder = commonFolder.createFolder(folderName);
-        }
-
         //Checking if MD file with same name is already present inside that folder. If present it will override the older file. If not it will create the new file.
-        file = checkIfFileExists(folder, DocumentApp.getActiveDocument().getName() + ".md");
-        if (file) {
-            file.replace(text);
-        } else {
-            file = DocsList.createFile(DocumentApp.getActiveDocument().getName() + ".md", text, 'text/plain');
-            file.addToFolder(folder);
-        }
+        var filename = DocumentApp.getActiveDocument().getName() + '.md';
+        removeExistingFiles(folder, filename);
+        file = DriveApp.createFile(filename, text, 'text/plain');
+        folder.addFile(file)
 
         //If there are any attachments in the file, it has to be saved in the same directory.
         //Due to this issue [http://code.google.com/p/google-apps-script-issues/issues/detail?id=1239], image files are created using blob. and replaced using Drive API.
@@ -254,82 +236,36 @@ function downloadMdFile() {
         .setHeight(100 /* pixels */ ));
 }
 
+/* This function returns the current folder. */
+function getCurrentFolder() {
+  // get the active document
+  var doc = DocumentApp.getActiveDocument();
 
-/* This function checks if there is a folder as given in the parameter exists in Google Drive */
-function checkIfFolderExists(folderName) {
-    var exist = true;
-    try {
-        var testFolder = DocsList.getFolder(folderName);
-    } catch (err) {
-        exist = false;
-    }
-    return exist;
+  // get the parent folders, could be more than one
+  var directParents = DriveApp.getFileById(doc.getId()).getParents();
+
+  var folderCount = 0;
+  while(directParents.hasNext()) {
+    folderCount++;
+    var currentFolder = directParents.next();
+  }
+  if (folderCount == 1) {
+    return currentFolder;
+  }
+  
+  Logger.log('Found more than one parent folder.');
+  return null;
 }
-/* This function chages the output folder into User defined folder */
-function changeOutputFolder() {
 
-    var ui = DocumentApp.getUi(); // Same variations.
-
-    var result = ui.prompt(
-        'Output Folder',
-        'Default output folder for converted markdowns is \"' + config.getInstance().getDefaultOutputFolder() + '\". ' + '\nCurrent output folder for converted markdown is \"' + config.getInstance().getCommonFolder() + '\".\n\n',
-
-        ui.ButtonSet.OK_CANCEL);
-    // Process the user's response.
-    var button = result.getSelectedButton();
-    var text = result.getResponseText();
-    if (button == ui.Button.OK) {
-        // User clicked "OK".
-        if (text.trim() !== "") {
-            config.getInstance().setCommonFolder(text);
-            ui.alert("Output Folder changed. All the future MD files will be stored in \"" + config.getInstance().getCommonFolder() + "\" folder.");
-        } else {
-            ui.alert("Please enter a valid folder name and try again");
-        }
-    } else if (button == ui.Button.CANCEL) {
-        // User clicked "Cancel".
-    } else if (button == ui.Button.CLOSE) {
-        // User clicked X in the title bar.
-    }
-
-
-}
-/* This function checks if there is a folder with the name "folderName" exists within "parentFolder" */
-/* If the folder is present, it will return the folder, else it will return false */
-function checkIfFolderExistsInParent(parentFolder, folderName) {
-    var exist = true;
-    try {
-        var folderCollection = parentFolder.getFolders();
-        if (folderCollection.length == 0)
-            exist = false;
-        else {
-            for (var i = 0; i < folderCollection.length; i++) {
-                if (folderCollection[i].getName() == folderName) {
-                    exist = folderCollection[i];
-                    return exist;
-                }
-            }
-        }
-        exist = false;
-    } catch (err) {
-        exist = false;
-    }
-    return exist;
-}
-/* This function checks if there is a file as given in the parameter exists in Google Drive */
-function checkIfFileExists(folder, fileName) {
-    var exist = true;
-    try {
-        //var testFolder = DocsList.getFolder(folderName);
-        var testFile = folder.find(fileName);
-        if (testFile.length > 0)
-            exist = testFile[0];
-        else
-            exist = false;
-    } catch (err) {
-        exist = false;
-    }
-    return exist;
+/* This function removes previous verions of the file */
+function removeExistingFiles(folder, filename) {
+  Logger.log(folder.getName());
+  Logger.log(filename)
+  var files = folder.getFilesByName(filename);
+  while (files.hasNext()) {
+    var file = files.next();
+    file.setTrashed(true);
+  }
 }
 
 function escapeHTML(text) {
