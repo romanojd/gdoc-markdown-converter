@@ -10,41 +10,6 @@ Running the script:
 - You can also view or donwload the converted file from the pop up, once the document is converted.
 */
 
-/* Configuration Section where the comomn folder - where the converted MD files will be stored, is configured */
-/* Made as a singelton, so that all the function who wants to get/set common folder act on single set of data */
-var config = (function() {
-  
-  var instance = {};
-  
-  instance.getDefaultOutputFolder = function() {
-    return PropertiesService.getUserProperties().getProperty("DEFAULT_OUTPUT_FOLDER");
-  }
-  
-  //Function for getting the current common folder value
-  instance.getCommonFolder = function() {
-    return PropertiesService.getUserProperties().getProperty('COMMON_FOLDER');
-  }
-  
-  //Function for setting the current common folder value
-  instance.setCommonFolder = function(folderName) {
-    PropertiesService.getUserProperties().setProperty('COMMON_FOLDER', folderName);
-  }
-  
-  function createInstance() {
-    var object = new Object();
-    return object;
-  }
-  
-  return {
-    getInstance: function() {
-      if (!instance) {
-        instance = createInstance();
-      }
-      
-      return instance;
-    }
-  };
-})();
 /**
 * Creates a menu entry in the Google Docs UI when the document is opened.
 *
@@ -115,7 +80,6 @@ function ConvertToMarkdown() {
   try {
     var numChildren = DocumentApp.getActiveDocument().getActiveSection().getNumChildren();
     var folder = getCurrentFolder();
-    var commonFolderName = config.getInstance().getCommonFolder();
     
     // Walk through all the child elements of the doc.
     for (var i = 0; i < numChildren; i++) {
