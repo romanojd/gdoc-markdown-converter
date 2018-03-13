@@ -162,7 +162,7 @@ function ConvertToMarkdown() {
     
     if (result !== null) {
       inSrc = result.inSrc;
-      Logger.log('inSrc: ' + inSrc);
+//      Logger.log('inSrc: ' + inSrc);
       
       if (inClass) {
         text += result.text + "\n\n";
@@ -219,28 +219,19 @@ function ConvertToMarkdown() {
     for (var iterator = 0; iterator < attachments.length; iterator++) {
       blob = attachments[iterator].content;
       content_type = blob.getContentType()
+      Logger.log('content_type: ' + content_type);
       suffix = content_type.split("/")[1] //e.g gif/jpg or png
-      image_name = "test.png" //Invent a name, the blob seems to need it?
-      blob.setName(image_name);
-      try {
-        image_name = "image_" + iterator + "." + suffix;
-        photo = checkIfFileExists(folder, image_name);
-        if (photo) {
-          photo.setTrashed(true);
-          photo = folder.createFile(blob);
-          //try {
-          //Drive.Files.remove(photo.getId());
-          //}
-          //catch (e) {
-          //DocsList.getFileById(photo.getId()).setTrashed(true);
-          //}
-        } else {
-          photo = folder.createFile(blob);
-        }
-        photo.rename(image_name);
-      } catch (e) {
-        throw ("Error in saving attached images : " + e);
-      }
+      blob.setName('test.png');  // Invent a name, the blob seems to need it?
+      
+//      try {
+      var image_name = "image_" + iterator + "." + suffix;
+      Logger.log('image_name: ' + image_name);
+      removeExistingFiles(folder, image_name);
+      photo = folder.createFile(blob);
+      photo.setName(image_name);
+//      } catch (e) {
+//        throw ("Error in saving attached images : " + e);
+//      }
       
     }
   }
@@ -385,6 +376,7 @@ function processParagraph(index, element, inSrc, imageCounter, listCounters) {
             }
             textElements.push(cell_text);
           } else {
+            Logger.log('unsupported element: ' + cell_elem_type);
             textElements.push('<NOT_PARA>');
           }
         }
@@ -423,7 +415,12 @@ function processParagraph(index, element, inSrc, imageCounter, listCounters) {
       textElements.push(txt);
     } else if (t === DocumentApp.ElementType.INLINE_IMAGE) {
       result.images = result.images || [];
-      var contentType = element.getChild(i).getBlob().getContentType();
+      var img = element.getChild(i);
+      var blob = img.getBlob();
+      var alt_title = img.getAltTitle() || 'no alt title';
+      
+      Logger.log('alt_title: ' + alt_title);
+      var contentType = blob.getContentType();
       var extension = "";
       if (/\/png$/.test(contentType)) {
         extension = ".png";
@@ -436,9 +433,9 @@ function processParagraph(index, element, inSrc, imageCounter, listCounters) {
       }
       var name = imagePrefix + imageCounter + extension;
       imageCounter++;
-      textElements.push('![image alt text](' + name + ')');
+      textElements.push('![' + alt_title + '](' + name + ')');
       result.images.push({
-        "bytes": element.getChild(i).getBlob(),
+        "bytes": blob,
         "type": contentType,
         "name": name
       });
